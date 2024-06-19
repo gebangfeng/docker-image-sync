@@ -58,7 +58,7 @@ jobs:
     - name: Sync Docker Image
       run: |
         ORIGIN_IMAGE="${{ steps.get-image.outputs.image }}"
-        TARGET_IMAGE="${{ secrets.REGISTRY }}/${secrets.NAMESPACE}/${ORIGIN_IMAGE}"
+        TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${{ ORIGIN_IMAGE }}"
         docker pull ${ORIGIN_IMAGE}
         docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
         docker push ${TARGET_IMAGE}

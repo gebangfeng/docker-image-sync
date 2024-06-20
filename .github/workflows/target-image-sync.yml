@@ -62,7 +62,7 @@ jobs:
         docker pull ${ORIGIN_IMAGE}
         docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
         docker push ${TARGET_IMAGE}
-        curl -X POST ${{ secrets.API_URL }} -H "Content-Type: application/json" -H "Authorization: Bearer ${{ secrets.APIKEY }}" -d '{"namespace": "${{ secrets.NAMESPACE }}" , "repository": "${ORIGIN_IMAGE}" }'
+        curl -X POST ${{ secrets.APIURL }} -H "Content-Type: application/json" -H "Authorization: Bearer ${{ secrets.APIKEY }}" -d '{"namespace": "${{ secrets.NAMESPACE }}" , "repository": "${ORIGIN_IMAGE}" }'
         gh issue comment ${{ github.event.issue.number }} -b "镜像 ${ORIGIN_IMAGE} 同步完成<br>请使用 ${TARGET_IMAGE} 替代源镜像"
         gh issue edit ${{ github.event.issue.number }} --add-label "sync image succeeded" -b "IMAGE SYNC"
         gh issue close ${{ github.event.issue.number }} --reason "completed"

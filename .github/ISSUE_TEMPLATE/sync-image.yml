@@ -15,7 +15,7 @@ body:
       label: 镜像地址
       description: "请输入完整的镜像地址，包括域名/路径:标签，例如 docker.io/library/python:3.6-slim"
       placeholder: "域名/路径:标签"
-
+      required: true
   - type: checkboxes
     id: domain
     attributes:

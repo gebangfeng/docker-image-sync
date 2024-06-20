@@ -33,16 +33,16 @@ jobs:
         fi
         if [[ "${ORIGIN_IMAGE%%/*}" != *"."* ]] || [[ "${ORIGIN_IMAGE}" != *"/"* ]]; then
           if [[ "${ORIGIN_IMAGE}" != *":"* ]]; then
-            gh issue comment ${{ github.event.issue.number }} -b "由于你没有指定tag或者域名将使用默认的仓库`docker.io`和默认的tag`latest`,如: `docker.io/${ORIGIN_IMAGE}:latest`"
+            gh issue comment ${{ github.event.issue.number }} -b "由于你没有指定tag或者域名将使用默认的仓库\`docker.io\`和默认的tag\`latest\`,如: \`docker.io/${ORIGIN_IMAGE}:latest\`"
             ORIGIN_IMAGE="docker.io/${ORIGIN_IMAGE}:latest"
           else
-            gh issue comment ${{ github.event.issue.number }} -b "由于你没有指定仓库名将使用默认的仓库`docker.io`,如: `docker.io/${ORIGIN_IMAGE}`"
+            gh issue comment ${{ github.event.issue.number }} -b "由于你没有指定仓库名将使用默认的仓库\`docker.io\`,如: \`docker.io/${ORIGIN_IMAGE}\`"
             ORIGIN_IMAGE="docker.io/${ORIGIN_IMAGE}"
           fi
           # exit 1
         fi
         if [[ "${ORIGIN_IMAGE}" != *":"* ]]; then
-          gh issue comment ${{ github.event.issue.number }} -b 由于你没有指定仓库名将使用默认的tag`latest`, 如: `${ORIGIN_IMAGE}:latest`"
+          gh issue comment ${{ github.event.issue.number }} -b 由于你没有指定仓库名将使用默认的tag\`latest\`, 如: \`${ORIGIN_IMAGE}:latest\`"
           ORIGIN_IMAGE="${ORIGIN_IMAGE}:latest"
           # exit 1
         fi

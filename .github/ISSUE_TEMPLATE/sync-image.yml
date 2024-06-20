@@ -1,5 +1,5 @@
 name: Sync Image
-description: 同步一个镜像
+description: 同步一个镜像到国内仓库,方便快速拉取
 labels:
   - sync image
 body:
@@ -9,13 +9,6 @@ body:
         # ↑↑↑↑↑↑↑↑↑↑↑ 填入你要同步的 Image
         ## 请包含 域名/路径:标签
 
-  - type: input
-    id: image
-    attributes:
-      label: 镜像地址
-      description: "请输入完整的镜像地址，包括域名/路径:标签，例如 docker.io/library/python:3.6-slim"
-      placeholder: "域名/路径:标签"
-      required: true
   - type: checkboxes
     id: domain
     attributes:

@@ -42,7 +42,7 @@ jobs:
           # exit 1
         fi
         if [[ "${ORIGIN_IMAGE}" != *":"* ]]; then
-          gh issue comment ${{ github.event.issue.number }} -b 由于你没有指定仓库名将使用默认的tag\`latest\`, 如: \`${ORIGIN_IMAGE}:latest\`"
+          gh issue comment ${{ github.event.issue.number }} -b "由于你没有指定仓库名将使用默认的tag\`latest\`, 如: \`${ORIGIN_IMAGE}:latest\`"
           ORIGIN_IMAGE="${ORIGIN_IMAGE}:latest"
           # exit 1
         fi

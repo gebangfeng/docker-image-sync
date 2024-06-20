@@ -98,9 +98,8 @@ jobs:
           # Shell 快速替换命令
           sed -i "s#${BASE_IMAGE}:latest#${TARGET_IMAGE}#g" 你的文件名
           \`\`\`
-          EOM
-                    )
-          gh issue comment ${{ github.event.issue.number }} -b "$COMMENT"          gh issue comment ${{ github.event.issue.number }} -b "$COMMENT"
+          EOM)
+          gh issue comment ${{ github.event.issue.number }} -b "$COMMENT"
           gh issue edit ${{ github.event.issue.number }} --add-label "sync image succeeded" -b "IMAGE SYNC"
           gh issue close ${{ github.event.issue.number }} --reason "completed"
         else

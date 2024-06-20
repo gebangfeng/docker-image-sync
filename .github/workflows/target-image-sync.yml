@@ -84,23 +84,8 @@ jobs:
         # Check if the response matches the expected value
         if [[ "$RESPONSE" == "$EXPECTED_VALUE" ]]; then
           echo "API call was successful and returned the expected value."
-          COMMENT=$(cat << EOM
-镜像 ${ORIGIN_IMAGE} 同步完成<br>请使用 ${TARGET_IMAGE} 替代源镜像<br><br>快捷命令：<br>
-\`\`\`sh
-# Docker 拉取命令
-docker pull ${TARGET_IMAGE}
-docker tag ${TARGET_IMAGE} ${BASE_IMAGE}:latest
-
-# Containerd 拉取命令
-ctr images pull ${TARGET_IMAGE}
-ctr images tag ${TARGET_IMAGE} ${BASE_IMAGE}:latest
-
-# Shell 快速替换命令
-sed -i "s#${BASE_IMAGE}:latest#${TARGET_IMAGE}#g" 你的文件名
-\`\`\`
-EOM
-          )
-          gh issue comment ${{ github.event.issue.number }} -b "$COMMENT"
+          # COMMENT=$(cat <<- 'EOM'\n镜像 ${ORIGIN_IMAGE} 同步完成<br>请使用 ${TARGET_IMAGE} 替代源镜像<br><br>快捷命令：<br>\n\`\`\`sh\n# Docker 拉取命令\ndocker pull ${TARGET_IMAGE}\ndocker tag ${TARGET_IMAGE} ${BASE_IMAGE}:latest\n\n# Containerd 拉取命令\nctr images pull ${TARGET_IMAGE}\nctr images tag ${TARGET_IMAGE} ${BASE_IMAGE}:latest\n\n# Shell 快速替换命令\nsed -i "s#${BASE_IMAGE}:latest#${TARGET_IMAGE}#g" 你的文件名\n\`\`\`\nEOM)
+          gh issue comment ${{ github.event.issue.number }} -b "$(echo -e "\n镜像 ${ORIGIN_IMAGE} 同步完成<br>请使用 ${TARGET_IMAGE} 替代源镜像<br><br>快捷命令：<br>\n\`\`\`sh\n# Docker 拉取命令\ndocker pull ${TARGET_IMAGE}\ndocker tag ${TARGET_IMAGE} ${BASE_IMAGE}:latest\n\n# Containerd 拉取命令\nctr imag.es pull ${TARGET_IMAGE}\nctr images tag ${TARGET_IMAGE} ${BASE_IMAGE}:latest\n\n# Shell 快速替换命令\nsed -i "s#${BASE_IMAGE}:latest#${TEARGET_IMAGE}#g" 你的文件名\n\`\`\`\n")"
           gh issue edit ${{ github.event.issue.number }} --add-label "sync image succeeded" -b "IMAGE SYNC"
           gh issue close ${{ github.event.issue.number }} --reason "completed"
         else

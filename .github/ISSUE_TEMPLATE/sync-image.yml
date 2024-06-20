@@ -1,50 +1,62 @@
 name: Sync Image
 description: 同步一个镜像
 labels:
-- sync image
+  - sync image
 body:
-- type: markdown
-  attributes:
-    value: |
-      # ↑↑↑↑↑↑↑↑↑↑↑ 填入你要同步的 Image
-      ## 请包含 域名/路径:标签
+  - type: markdown
+    attributes:
+      value: |
+        # ↑↑↑↑↑↑↑↑↑↑↑ 填入你要同步的 Image
+        ## 请包含 域名/路径:标签
 
-- type: checkboxes
-  attributes:
-    label: domain
-    options:
-    - label: 请确保包含域名(domain)
-- type: markdown
-  attributes:
-    value: |
-      - 如 docker.io/
-      - 如 registry.k8s.io/
-      - 如果不包含域名, 需要主动添加默认的 docker.io/
+  - type: input
+    id: image
+    attributes:
+      label: 镜像地址
+      description: "请输入完整的镜像地址，包括域名/路径:标签，例如 docker.io/library/python:3.6-slim"
+      placeholder: "域名/路径:标签"
+      required: true
 
-- type: checkboxes
-  attributes:
-    label: tag
-    options:
-    - label: 请确保包含镜像的标签(tag)
-- type: markdown
-  attributes:
-    value: |
-      - 如 :latest
-      - 如 :v1
+  - type: checkboxes
+    id: domain
+    attributes:
+      label: 域名确认
+      options:
+        - label: 请确保包含域名(domain)
+          required: true
 
-- type: checkboxes
-  attributes:
-    label: check
-    options:
-    - label: 请确保这个镜像真实存在
-- type: markdown
-  attributes:
-    value: |
-      - 如 docker.io/library/busybox:latest
-      - 如 docker.io/kindest/node:v1.30.0
-      - 如 registry.k8s.io/kubectl:v1.30.0
+  - type: markdown
+    attributes:
+      value: |
+        - 如 docker.io/
+        - 如 registry.k8s.io/
+        - 如果不包含域名, 需要主动添加默认的 docker.io/
 
-- type: markdown
-  attributes:
-    value: |
-      有疑问反馈, 请添加我们的企微群 [#4183](https://github.com/DaoCloud/public-image-mirror/issues/4183)
+  - type: checkboxes
+    id: tag
+    attributes:
+      label: 标签确认
+      options:
+        - label: 请确保包含镜像的标签(tag)
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        - 如 :latest
+        - 如 :v1
+
+  - type: checkboxes
+    id: check
+    attributes:
+      label: 镜像存在性确认
+      options:
+        - label: 请确保这个镜像真实存在
+          required: true
+
+  - type: markdown
+    attributes:
+      value: |
+        - 如 docker.io/library/busybox:latest
+        - 如 docker.io/kindest/node:v1.30.0
+        - 如 registry.k8s.io/kubectl:v1.30.0

@@ -15,7 +15,6 @@ body:
       label: 镜像地址
       description: "请输入完整的镜像地址，包括域名/路径:标签，例如 docker.io/library/python:3.6-slim"
       placeholder: "域名/路径:标签"
-      required: true
 
   - type: checkboxes
     id: domain
@@ -23,7 +22,6 @@ body:
       label: 域名确认
       options:
         - label: 请确保包含域名(domain)
-          required: true
 
   - type: markdown
     attributes:
@@ -38,7 +36,6 @@ body:
       label: 标签确认
       options:
         - label: 请确保包含镜像的标签(tag)
-          required: true
 
   - type: markdown
     attributes:
@@ -52,7 +49,6 @@ body:
       label: 镜像存在性确认
       options:
         - label: 请确保这个镜像真实存在
-          required: true
 
   - type: markdown
     attributes:

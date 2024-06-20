@@ -58,19 +58,34 @@ jobs:
     - name: Sync Docker Image
       run: |
         ORIGIN_IMAGE="${{ steps.get-image.outputs.image }}"
-        TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${ORIGIN_IMAGE}"
+        BASE_IMAGE=$(echo ${ORIGIN_IMAGE} | sed 's/\(.*\):.*/\1/')
+        TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${BASE_IMAGE}"
+        
         docker pull ${ORIGIN_IMAGE}
         docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
         docker push ${TARGET_IMAGE}
-        BASE_IMAGE=$(echo ${ORIGIN_IMAGE} | sed 's/\(.*\):.*/\1/')
-        # curl -X POST ${{ secrets.APIURL }} -H "Content-Type: application/json" -H "Authorization: Bearer ${{ secrets.APIKEY }}" -d '{"namespace": "${{ secrets.NAMESPACE }}" , "repository": "${ORIGIN_IMAGE}" }'
-        curl -X POST "${{ secrets.APIURL }}" \
+        
+        # Capture the response from curl
+        RESPONSE=$(curl -s -X POST "${{ secrets.APIURL }}" \
           -H "Content-Type: application/json" \
           -H "Authorization: Bearer ${{ secrets.APIKEY }}" \
-          -d "{\"namespace\": \"${{ secrets.NAMESPACE }}\" , \"repository\": \"${BASE_IMAGE}\" }"
-        gh issue comment ${{ github.event.issue.number }} -b "镜像 ${ORIGIN_IMAGE} 同步完成<br>请使用 ${TARGET_IMAGE} 替代源镜像"
-        gh issue edit ${{ github.event.issue.number }} --add-label "sync image succeeded" -b "IMAGE SYNC"
-        gh issue close ${{ github.event.issue.number }} --reason "completed"
+          -d "{\"namespace\": \"${{ secrets.NAMESPACE }}\" , \"repository\": \"${BASE_IMAGE}\" }")
+    
+        # Define the expected value
+        EXPECTED_VALUE='{"message":"已将仓库设置为公开"}'
+    
+        # Check if the response matches the expected value
+        if [[ "$RESPONSE" == "$EXPECTED_VALUE" ]]; then
+          echo "API call was successful and returned the expected value."
+          gh issue comment ${{ github.event.issue.number }} -b "镜像 ${ORIGIN_IMAGE} 同步完成<br>请使用 ${TARGET_IMAGE} 替代源镜像"
+          gh issue edit ${{ github.event.issue.number }} --add-label "sync image succeeded" -b "IMAGE SYNC"
+          gh issue close ${{ github.event.issue.number }} --reason "completed"
+        else
+          echo "API call did not return the expected value."
+          echo "Response: $RESPONSE"
+          exit 1
+        fi
+
     # - name: Sync Images
     #   run: |
     #     ORIGIN_IMAGE="${{ steps.get-image.outputs.image }}"

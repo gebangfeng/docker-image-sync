@@ -4,7 +4,6 @@ on:
     types:
       - opened
 
-# https://docs.github.com/en/actions/security-guides/automatic-token-authentication#permissions-for-the-github_token
 permissions:
   issues: write
 
@@ -14,13 +13,15 @@ jobs:
     if: contains(github.event.issue.labels.*.name, 'sync image')
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # REGISTRY: ${{ secrets.REGISTRY }}
-      # NAME_SPACE: ${{ secrets.NAME_SPACE }}
-      # USER: ${{ secrets.USER }}
-      # PASSWORD: ${{ secrets.PASSWORD }}
+      REGISTRY: ${{ secrets.REGISTRY }}
+      NAMESPACE: ${{ secrets.NAMESPACE }}
+      USER: ${{ secrets.DOCKER_USERNAME }}
+      PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+
     - name: Check Issue
       id: get-image
       env:
@@ -36,25 +37,24 @@ jobs:
             gh issue comment ${{ github.event.issue.number }} -b "由于你没有指定tag或者域名将使用默认的仓库\`docker.io\`和默认的tag\`latest\`,如: \`docker.io/${ORIGIN_IMAGE}:latest\`"
             ORIGIN_IMAGE="docker.io/${ORIGIN_IMAGE}:latest"
             gh issue edit ${{ github.event.issue.number }} --title "${ORIGIN_IMAGE}"
-
           else
             gh issue comment ${{ github.event.issue.number }} -b "由于你没有指定仓库名将使用默认的仓库\`docker.io\`,如: \`docker.io/${ORIGIN_IMAGE}\`"
             ORIGIN_IMAGE="docker.io/${ORIGIN_IMAGE}"
             gh issue edit ${{ github.event.issue.number }} --title "${ORIGIN_IMAGE}"
           fi
-          # exit 1
         fi
         if [[ "${ORIGIN_IMAGE}" != *":"* ]]; then
           gh issue comment ${{ github.event.issue.number }} -b "由于你没有指定仓库名将使用默认的tag\`latest\`, 如: \`${ORIGIN_IMAGE}:latest\`"
           ORIGIN_IMAGE="${ORIGIN_IMAGE}:latest"
           gh issue edit ${{ github.event.issue.number }} --title "${ORIGIN_IMAGE}"
-          # exit 1
         fi
         echo "image=${ORIGIN_IMAGE}" >> $GITHUB_OUTPUT
+
     - name: Check Image
       run: |
         ORIGIN_IMAGE="${{ steps.get-image.outputs.image }}"
         gh issue comment ${{ github.event.issue.number }} -b "镜像 ${ORIGIN_IMAGE} 同步中...<br>[详情请查看](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+
     - name: Set up Docker
       uses: docker/setup-buildx-action@v1
 
@@ -62,59 +62,47 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y skopeo
+
     - name: Login to Docker Hub
       uses: docker/login-action@v1
       with:
         registry: ${{ secrets.REGISTRY }}
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
-    - name: Sync Docker Image
+
+    - name: Sync Multi-Arch Docker Image to Aliyun
       run: |
         ORIGIN_IMAGE="${{ steps.get-image.outputs.image }}"
-        BASE_IMAGE=$(echo ${ORIGIN_IMAGE} | sed 's/\(.*\):.*/\1/')
         TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${ORIGIN_IMAGE}"
-        skopeo copy -a docker://${ORIGIN_IMAGE} docker://${TARGET_IMAGE}
-        # docker pull ${ORIGIN_IMAGE}
-        # docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
-        # docker push ${TARGET_IMAGE}
-        
-        # Capture the response from curl
-        RESPONSE=$(curl -s -X POST "${{ secrets.APIURL }}" \
-          -H "Content-Type: application/json" \
-          -H "Authorization: Bearer ${{ secrets.APIKEY }}" \
-          -d "{\"namespace\": \"${{ secrets.NAMESPACE }}\" , \"repository\": \"${BASE_IMAGE}\" }")
-    
-        # Define the expected value
-        EXPECTED_VALUE='{"message":"已将仓库设置为公开"}'
-    
-        # Check if the response matches the expected value
-        if [[ "$RESPONSE" == "$EXPECTED_VALUE" ]]; then
-          echo "API call was successful and returned the expected value."
-          gh issue comment ${{ github.event.issue.number }} -b "$(echo -e "\n镜像 ${ORIGIN_IMAGE} 同步完成<br>请使用 ${TARGET_IMAGE} 替代源镜像<br><br> <h1>快捷命令</h1><br>\n\`\`\`sh\n# Docker 拉取命令\ndocker pull ${TARGET_IMAGE}\ndocker tag ${TARGET_IMAGE} ${ORIGIN_IMAGE}\n\n# Containerd 拉取命令\nctr images pull ${TARGET_IMAGE}\nctr images tag ${TARGET_IMAGE} ${ORIGIN_IMAGE}\n\n# Shell 快速替换命令\nsed -i "s#${ORIGIN_IMAGE}#${TEARGET_IMAGE}#g" 你的文件名\n\`\`\`\n")"
-          gh issue edit ${{ github.event.issue.number }} --add-label "sync image succeeded" -b "IMAGE SYNC"
-          gh issue close ${{ github.event.issue.number }} --reason "completed"
-        else
-          echo "API call did not return the expected value."
-          echo "Response: $RESPONSE"
-          exit 1
-        fi
 
-    # - name: Sync Images
-    #   run: |
-    #     ORIGIN_IMAGE="${{ steps.get-image.outputs.image }}"
-    #     # curl --fail -X PUT "http://127.0.0.1:8000/internal/api/image/sync?image=${ORIGIN_IMAGE}"
-    #     # if ! ./hack/verify-allows.sh ./allows.txt "${ORIGIN_IMAGE}"; then
-    #     #   gh issue comment ${{ github.event.issue.number }} -b "镜像 ${ORIGIN_IMAGE} 同步完成<br>请使用 m.daocloud.io/${ORIGIN_IMAGE} 替代源镜像<br>这个镜像不在白名单列表里, 在未来可能将无法访问<br>将其添加到[白名单](https://github.com/DaoCloud/public-image-mirror/blob/main/allows.txt)"
-    #     # else
-    #     #   gh issue comment ${{ github.event.issue.number }} -b "镜像 ${ORIGIN_IMAGE} 同步完成<br>请使用 m.daocloud.io/${ORIGIN_IMAGE} 替代源镜像"
-    #     # fi
-    #     gh issue comment ${{ github.event.issue.number }} -b "镜像 ${ORIGIN_IMAGE} 同步完成<br>请使用 m.daocloud.io/${ORIGIN_IMAGE} 替代源镜像"
-    #     gh issue edit ${{ github.event.issue.number }} --add-label "sync image succeeded" -b "IMAGE SYNC"
-    #     gh issue close ${{ github.event.issue.number }} --reason "completed"
+        # Temporary directory for storing image layers
+        TEMP_DIR=$(mktemp -d)
+
+        # List of architectures
+        ARCHS=("amd64" "arm64" "arm")
+
+        # Pull and copy each architecture
+        for ARCH in "${ARCHS[@]}"; do
+          skopeo copy --override-arch=$ARCH docker://${ORIGIN_IMAGE} docker-archive:$TEMP_DIR/redis-$ARCH.tar
+          skopeo copy docker-archive:$TEMP_DIR/redis-$ARCH.tar docker://${TARGET_IMAGE} --dest-creds ${{ secrets.DOCKER_USERNAME }}:${{ secrets.DOCKER_PASSWORD }}
+        done
+
+        # Create and push the multi-arch manifest
+        skopeo manifest create docker://${TARGET_IMAGE} --all $TEMP_DIR/redis-amd64.tar $TEMP_DIR/redis-arm64.tar $TEMP_DIR/redis-arm.tar
+        skopeo manifest push --dest-creds ${{ secrets.DOCKER_USERNAME }}:${{ secrets.DOCKER_PASSWORD }} docker://${TARGET_IMAGE}
+
+    - name: Notify Success
+      if: success()
+      run: |
+        ORIGIN_IMAGE="${{ steps.get-image.outputs.image }}"
+        gh issue comment ${{ github.event.issue.number }} -b "镜像 ${ORIGIN_IMAGE} 同步完成<br>请使用 ${TARGET_IMAGE} 替代源镜像"
+        gh issue edit ${{ github.event.issue.number }} --add-label "sync image succeeded"
+        gh issue close ${{ github.event.issue.number }} --reason "completed"
+
     - name: Fail Sync
       if: failure()
       run: |
         ORIGIN_IMAGE="${{ steps.get-image.outputs.image }}"
-        gh issue comment ${{ github.event.issue.number }} -b "镜像 ${ORIGIN_IMAGE} 同步失败[详情请查看](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})<br>请检查 image 是否存在, [查看成功例子](https://github.com/kubesre/docker-registry-mirrors/issues/13)<br>如果需要同步, 请重新提交正确的issue"
-        gh issue edit ${{ github.event.issue.number }} --add-label "sync image failure" -b "IMAGE SYNC"
+        gh issue comment ${{ github.event.issue.number }} -b "镜像 ${ORIGIN_IMAGE} 同步失败[详情请查看](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})<br>请检查 image 是否存在"
+        gh issue edit ${{ github.event.issue.number }} --add-label "sync image failure"
         gh issue close ${{ github.event.issue.number }} --reason "not planned"

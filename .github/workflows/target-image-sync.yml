@@ -73,7 +73,7 @@ jobs:
     - name: Sync Multi-Arch Docker Image to Aliyun
       run: |
         ORIGIN_IMAGE="${{ steps.get-image.outputs.image }}"
-        TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${ORIGIN_IMAGE}"
+        TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${ORIGIN_IMAGE##*/}"
 
         # Temporary directory for storing image layers
         TEMP_DIR=$(mktemp -d)
@@ -83,18 +83,19 @@ jobs:
 
         # Pull and copy each architecture
         for ARCH in "${ARCHS[@]}"; do
-          skopeo copy --override-arch=$ARCH docker://${ORIGIN_IMAGE} docker-archive:$TEMP_DIR/redis-$ARCH.tar
-          skopeo copy docker-archive:$TEMP_DIR/redis-$ARCH.tar docker://${TARGET_IMAGE}
+          skopeo copy --override-arch=$ARCH docker://${ORIGIN_IMAGE} docker-archive:$TEMP_DIR/image-$ARCH.tar
+          skopeo copy docker-archive:$TEMP_DIR/image-$ARCH.tar docker://${TARGET_IMAGE}
         done
 
         # Create and push the multi-arch manifest
-        skopeo manifest create docker://${TARGET_IMAGE} $TEMP_DIR/redis-amd64.tar $TEMP_DIR/redis-arm64.tar $TEMP_DIR/redis-arm.tar
+        skopeo manifest create docker://${TARGET_IMAGE} $TEMP_DIR/image-amd64.tar $TEMP_DIR/image-arm64.tar $TEMP_DIR/image-arm.tar
         skopeo manifest push docker://${TARGET_IMAGE}
 
     - name: Notify Success
       if: success()
       run: |
         ORIGIN_IMAGE="${{ steps.get-image.outputs.image }}"
+        TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${ORIGIN_IMAGE##*/}"
         gh issue comment ${{ github.event.issue.number }} -b "镜像 ${ORIGIN_IMAGE} 同步完成<br>请使用 ${TARGET_IMAGE} 替代源镜像"
         gh issue edit ${{ github.event.issue.number }} --add-label "sync image succeeded"
         gh issue close ${{ github.event.issue.number }} --reason "completed"

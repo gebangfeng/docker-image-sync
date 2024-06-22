@@ -87,10 +87,6 @@ jobs:
           skopeo copy docker-archive:$TEMP_DIR/image-$ARCH.tar docker://${TARGET_IMAGE}
         done
 
-        # Create and push the multi-arch manifest
-        skopeo manifest create docker://${TARGET_IMAGE} $TEMP_DIR/image-amd64.tar $TEMP_DIR/image-arm64.tar $TEMP_DIR/image-arm.tar
-        skopeo manifest push docker://${TARGET_IMAGE}
-
     - name: Notify Success
       if: success()
       run: |

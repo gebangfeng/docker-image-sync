@@ -84,7 +84,7 @@ jobs:
         # Pull and copy each architecture
         for ARCH in "${ARCHS[@]}"; do
           skopeo copy --override-arch=$ARCH docker://${ORIGIN_IMAGE} docker-archive:$TEMP_DIR/redis-$ARCH.tar
-          skopeo copy docker-archive:$TEMP_DIR/redis-$ARCH.tar docker://${TARGET_IMAGE} --dest-creds ${{ secrets.DOCKER_USERNAME }}:${{ secrets.DOCKER_PASSWORD }}
+          skopeo copy docker-archive:$TEMP_DIR/redis-$ARCH.tar docker://${TARGET_IMAGE}
         done
 
         # Create and push the multi-arch manifest

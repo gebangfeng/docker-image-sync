@@ -88,7 +88,7 @@ jobs:
         done
 
         # Create and push the multi-arch manifest
-        skopeo manifest create docker://${TARGET_IMAGE} --all $TEMP_DIR/redis-amd64.tar $TEMP_DIR/redis-arm64.tar $TEMP_DIR/redis-arm.tar
+        skopeo manifest create docker://${TARGET_IMAGE} $TEMP_DIR/redis-amd64.tar $TEMP_DIR/redis-arm64.tar $TEMP_DIR/redis-arm.tar
         skopeo manifest push --dest-creds ${{ secrets.DOCKER_USERNAME }}:${{ secrets.DOCKER_PASSWORD }} docker://${TARGET_IMAGE}
 
     - name: Notify Success

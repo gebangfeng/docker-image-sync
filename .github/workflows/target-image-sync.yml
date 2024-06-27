@@ -70,7 +70,7 @@ jobs:
         ORIGIN_IMAGE="${{ steps.get-image.outputs.image }}"
         BASE_IMAGE=$(echo ${ORIGIN_IMAGE} | sed 's/\(.*\):.*/\1/')
         TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${ORIGIN_IMAGE}"
-        skopeo copy ${ORIGIN_IMAGE} ${TARGET_IMAGE}
+        skopeo copy docker://${ORIGIN_IMAGE} docker://${TARGET_IMAGE}
         docker images
         # Capture the response from curl
         RESPONSE=$(curl -s -X POST "${{ secrets.APIURL }}" \

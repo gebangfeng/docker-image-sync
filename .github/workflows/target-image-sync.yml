@@ -75,10 +75,10 @@ jobs:
         # docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
         # docker push ${TARGET_IMAGE}
         docker pull ${TARGET_IMAGE}
-        data=`docker inspect ${TARGET_IMAGE}`
+        data=$(docker inspect ${TARGET_IMAGE})
         RESPONSE=$(curl -s -X POST "${{ secrets.APIURL }}/docker_metadata/" \
           -H "Content-Type: application/json" \
-          -d "data")
+          -d "${data}")
         EXPECTED_VALUE='{"message": "All items have been successfully processed."}'
         if [[ "$RESPONSE" == "$EXPECTED_VALUE" ]]; then
             echo "EXPECTED_VALUE"

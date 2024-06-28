@@ -82,6 +82,7 @@ jobs:
         EXPECTED_VALUE='{"message": "All items have been successfully processed."}'
         if [[ "$RESPONSE" == "$EXPECTED_VALUE" ]]; then
             echo "EXPECTED_VALUE"
+        fi
         # Capture the response from curl
         RESPONSE=$(curl -s -X POST "${{ secrets.APIURL }}/set-image-public/" \
           -H "Content-Type: application/json" \

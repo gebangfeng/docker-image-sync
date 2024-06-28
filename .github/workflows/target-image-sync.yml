@@ -74,8 +74,8 @@ jobs:
         # docker pull ${ORIGIN_IMAGE}
         # docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
         # docker push ${TARGET_IMAGE}
-        docker pull ${ORIGIN_IMAGE}
-        docker inspect ${ORIGIN_IMAGE}
+        docker pull ${TARGET_IMAGE}
+        docker inspect ${TARGET_IMAGE}
         # Capture the response from curl
         RESPONSE=$(curl -s -X POST "${{ secrets.APIURL }}" \
           -H "Content-Type: application/json" \

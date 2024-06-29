@@ -70,10 +70,10 @@ jobs:
         ORIGIN_IMAGE="${{ steps.get-image.outputs.image }}"
         BASE_IMAGE=$(echo ${ORIGIN_IMAGE} | sed 's/\(.*\):.*/\1/')
         TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${ORIGIN_IMAGE}"
-        skopeo copy docker://${ORIGIN_IMAGE} docker://${TARGET_IMAGE}
-        # docker pull ${ORIGIN_IMAGE}
-        # docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
-        # docker push ${TARGET_IMAGE}
+        # skopeo copy docker://${ORIGIN_IMAGE} docker://${TARGET_IMAGE}
+        docker pull ${ORIGIN_IMAGE}
+        docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
+        docker push ${TARGET_IMAGE}
         docker pull ${TARGET_IMAGE}
         # docker inspect ${TARGET_IMAGE}
         curl -s -X POST "${{ secrets.APIURL }}/docker_metadata/" \

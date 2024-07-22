@@ -68,13 +68,13 @@ jobs:
         EXPECTED_VALUE='{"message":"已将仓库设置为公开"}'
         if [[ "$RESPONSE" == "$EXPECTED_VALUE" ]]; then
                    if [[ -n "${EMAIL}" ]]; then
-            echo "镜像同步已完成，请使用新的镜像: ${TARGET_IMAGE}" ${EMAIL}"
+            echo "镜像同步已完成，请使用新的镜像: ${TARGET_IMAGE} ${EMAIL}"
           fi
         else
           echo "API call did not return the expected value."
           echo "Response: $RESPONSE"
           exit 1
-         fi
+        fi
 
     - name: Fail Sync
       if: failure()

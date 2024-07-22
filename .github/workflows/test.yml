@@ -1,4 +1,4 @@
-name: Target Sync Image
+name: Sync Image - ${{ github.event.inputs.image }}:${{ github.event.inputs.tag }}
 on:
   workflow_dispatch:
     inputs:

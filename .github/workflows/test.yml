@@ -54,28 +54,28 @@ jobs:
         password: ${{ secrets.DOCKER_PASSWORD }}
 
     - name: Sync Docker Image
+      id: synced
       run: |
         ORIGIN_IMAGE="${{ steps.prepare.outputs.image }}"
         EMAIL="${{ steps.prepare.outputs.email }}"
         BASE_IMAGE=$(echo ${ORIGIN_IMAGE} | sed 's/\(.*\):.*/\1/')
         TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${ORIGIN_IMAGE}"
-        # skopeo copy docker://${ORIGIN_IMAGE} docker://${TARGET_IMAGE}
         docker pull ${ORIGIN_IMAGE}
         docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
         docker push ${TARGET_IMAGE}
         docker pull ${TARGET_IMAGE}
-        # docker inspect ${TARGET_IMAGE}
         curl -s -X POST "${{ secrets.APIURL }}/docker_metadata/" \
           -H "Content-Type: application/json" \
           -d "`docker inspect ${TARGET_IMAGE}`"
-        # Capture the response from curl
         RESPONSE=$(curl -s -X POST "${{ secrets.APIURL }}/set-image-public/" \
           -H "Content-Type: application/json" \
           -d "{\"namespace\": \"${{ secrets.NAMESPACE }}\" , \"repository\": \"${BASE_IMAGE}\" }")
         EXPECTED_VALUE='{"message":"已将仓库设置为公开"}'
         if [[ "$RESPONSE" == "$EXPECTED_VALUE" ]]; then
-            if [[ -n "${EMAIL}" ]]; then
-            echo "镜像同步已完成，请使用新的镜像: ${TARGET_IMAGE} ${EMAIL}"
+          if [[ -n "${EMAIL}" ]]; then
+            echo "镜像同步已完成，请使用新的镜像: ${TARGET_IMAGE}"
+            echo "target_image=${TARGET_IMAGE}" >> $GITHUB_OUTPUT
+            echo "origin_image=${ORIGIN_IMAGE}" >> $GITHUB_OUTPUT
           fi
         else
           echo "API call did not return the expected value."
@@ -83,10 +83,28 @@ jobs:
           exit 1
         fi
 
-    - name: Fail Sync
-      if: failure()
-      run: |
-        ORIGIN_IMAGE="${{ steps.prepare.outputs.image }}"
-        if [[ -n "${EMAIL}" ]]; then
-          echo "镜像同步失败，请检查 image 是否存在,请检查错误日志: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-        fi
+    - name: Send Email Notification
+      if: success() && steps.prepare.outputs.email != ''
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: ${{ secrets.EMAIL_SERVER }}
+        server_port: ${{ secrets.EMAIL_PORT }}
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: 镜像同步完成
+        body: 镜像同步已完成，请使用新的镜像:${{ steps.synced.outputs.target_image }}代替旧的镜像${{ steps.synced.outputs.origin_image }}
+        to: ${{ steps.prepare.outputs.email }}
+        from: 云原生运维圈
+
+    - name: Send Email Notification
+      if: failure() && steps.prepare.outputs.email != ''
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: ${{ secrets.EMAIL_SERVER }}
+        server_port: ${{ secrets.EMAIL_PORT }}
+        username: ${{ secrets.EMAIL_USERNAME }}
+        password: ${{ secrets.EMAIL_PASSWORD }}
+        subject: 镜像同步失败
+        body: 镜像同步失败，请检查 image 是否存在,请检查错误日志:https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        to: ${{ steps.prepare.outputs.email }}
+        from: 云原生运维圈

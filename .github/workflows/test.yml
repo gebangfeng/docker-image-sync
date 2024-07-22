@@ -55,11 +55,14 @@ jobs:
     - name: Sync Docker Image
       run: |
         ORIGIN_IMAGE="${{ steps.prepare.outputs.image }}"
+        BASE_IMAGE=$(echo ${ORIGIN_IMAGE} | sed 's/\(.*\):.*/\1/')
         TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${ORIGIN_IMAGE}"
-	BASE_IMAGE=$(echo ${ORIGIN_IMAGE} | sed 's/\(.*\):.*/\1/')
-        docker pull ${ORIGIN_IMAGE}
-        docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
-        docker push ${TARGET_IMAGE}
+        skopeo copy docker://${ORIGIN_IMAGE} docker://${TARGET_IMAGE}
+        # docker pull ${ORIGIN_IMAGE}
+        # docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
+        # docker push ${TARGET_IMAGE}
+        docker pull ${TARGET_IMAGE}
+        # docker inspect ${TARGET_IMAGE}
         curl -s -X POST "${{ secrets.APIURL }}/docker_metadata/" \
           -H "Content-Type: application/json" \
           -d "`docker inspect ${TARGET_IMAGE}`"
@@ -76,7 +79,7 @@ jobs:
           echo "API call did not return the expected value."
           echo "Response: $RESPONSE"
           exit 1
-       fi
+        fi
 
     - name: Fail Sync
       if: failure()

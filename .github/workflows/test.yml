@@ -56,15 +56,17 @@ jobs:
       run: |
         ORIGIN_IMAGE="${{ steps.prepare.outputs.image }}"
         TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${ORIGIN_IMAGE}"
+	      BASE_IMAGE=$(echo ${ORIGIN_IMAGE} | sed 's/\(.*\):.*/\1/')
         docker pull ${ORIGIN_IMAGE}
         docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
         docker push ${TARGET_IMAGE}
         curl -s -X POST "${{ secrets.APIURL }}/docker_metadata/" \
           -H "Content-Type: application/json" \
           -d "`docker inspect ${TARGET_IMAGE}`"
+        # Capture the response from curl
         RESPONSE=$(curl -s -X POST "${{ secrets.APIURL }}/set-image-public/" \
           -H "Content-Type: application/json" \
-          -d "{\"namespace\": \"${{ secrets.NAMESPACE }}\" , \"repository\": \"${TARGET_IMAGE}\" }")
+          -d "{\"namespace\": \"${{ secrets.NAMESPACE }}\" , \"repository\": \"${BASE_IMAGE}\" }")
         EXPECTED_VALUE='{"message":"已将仓库设置为公开"}'
         if [[ "$RESPONSE" == "$EXPECTED_VALUE" ]]; then
                    if [[ -n "${EMAIL}" ]]; then
@@ -74,7 +76,7 @@ jobs:
           echo "API call did not return the expected value."
           echo "Response: $RESPONSE"
           exit 1
-        fi
+       fi
 
     - name: Fail Sync
       if: failure()

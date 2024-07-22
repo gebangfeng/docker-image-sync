@@ -34,13 +34,16 @@ jobs:
         TAG="${{ github.event.inputs.tag }}"
         PLATFORM="${{ github.event.inputs.platform }}"
         EMAIL="${{ github.event.inputs.email }}"
+        ARCH_TAG=$(echo $PLATFORM | tr '/' '-')
         if [[ -z "${TAG}" ]]; then
           TAG="latest"
         fi
         ORIGIN_IMAGE="${IMAGE}:${TAG}"
+        TARGET_TAG="${TAG}-${ARCH_TAG}"
         echo "image=${ORIGIN_IMAGE}" >> $GITHUB_OUTPUT
         echo "platform=${PLATFORM}" >> $GITHUB_OUTPUT
         echo "email=${EMAIL}" >> $GITHUB_OUTPUT
+        echo "target_tag=${TARGET_TAG}" >> $GITHUB_OUTPUT
 
     - name: Check Image
       run: |
@@ -61,8 +64,9 @@ jobs:
       run: |
         ORIGIN_IMAGE="${{ steps.prepare.outputs.image }}"
         PLATFORM=${{ steps.prepare.outputs.platform }}
+        TARGET_TAG="${{ steps.prepare.outputs.target_tag }}"
         BASE_IMAGE=$(echo ${ORIGIN_IMAGE} | sed 's/\(.*\):.*/\1/')
-        TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${ORIGIN_IMAGE}"
+        TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${BASE_IMAGE}:${TARGET_TAG}"
         docker pull --platform ${PLATFORM} ${ORIGIN_IMAGE}
         docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
         docker push ${TARGET_IMAGE}

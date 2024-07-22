@@ -96,7 +96,7 @@ jobs:
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
         subject: 镜像同步完成
-        body: 镜像同步已完成，请使用新的镜像:${{ steps.synced.outputs.target_image }}代替旧的镜像${{ steps.synced.outputs.origin_image }}
+        body: "镜像同步已完成，请使用新的镜像: ${{ steps.synced.outputs.target_image }} 代替旧的镜像 ${{ steps.synced.outputs.origin_image }} CPU平台: ${{ steps.prepare.outputs.platform }}"
         to: ${{ steps.prepare.outputs.email }}
         from: 云原生运维圈镜像站
 

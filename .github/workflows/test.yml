@@ -74,6 +74,7 @@ jobs:
           echo "API call did not return the expected value."
           echo "Response: $RESPONSE"
           exit 1
+         fi
 
     - name: Fail Sync
       if: failure()

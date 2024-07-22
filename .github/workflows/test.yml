@@ -45,7 +45,10 @@ jobs:
     - name: Check Image
       run: |
         ORIGIN_IMAGE="${{ steps.prepare.outputs.image }}"
-
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v2
+      with:
+        platforms: ${{ steps.prepare.outputs.platform }}
     - name: Login to Docker Hub
       uses: docker/login-action@v1
       with:
@@ -57,13 +60,12 @@ jobs:
       id: synced
       run: |
         ORIGIN_IMAGE="${{ steps.prepare.outputs.image }}"
-        EMAIL="${{ steps.prepare.outputs.email }}"
+        PLATFORM=${{ steps.prepare.outputs.platform }}
         BASE_IMAGE=$(echo ${ORIGIN_IMAGE} | sed 's/\(.*\):.*/\1/')
         TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${ORIGIN_IMAGE}"
-        docker pull ${ORIGIN_IMAGE}
+        docker pull --platform ${PLATFORM} ${ORIGIN_IMAGE}
         docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
         docker push ${TARGET_IMAGE}
-        docker pull ${TARGET_IMAGE}
         curl -s -X POST "${{ secrets.APIURL }}/docker_metadata/" \
           -H "Content-Type: application/json" \
           -d "`docker inspect ${TARGET_IMAGE}`"
@@ -94,7 +96,7 @@ jobs:
         subject: 镜像同步完成
         body: 镜像同步已完成，请使用新的镜像:${{ steps.synced.outputs.target_image }}代替旧的镜像${{ steps.synced.outputs.origin_image }}
         to: ${{ steps.prepare.outputs.email }}
-        from: 云原生运维圈
+        from: 云原生运维圈镜像站
 
     - name: Send Email Notification
       if: failure() && steps.prepare.outputs.email != ''
@@ -105,6 +107,6 @@ jobs:
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
         subject: 镜像同步失败
-        body: 镜像同步失败，请检查 image 是否存在,请检查错误日志:https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        body: 镜像同步失败，请检查 image 是否存在,详情查看错误日志:https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         to: ${{ steps.prepare.outputs.email }}
-        from: 云原生运维圈
+        from: 云原生运维圈镜像站

@@ -39,7 +39,7 @@ jobs:
         username: ${{ secrets.EMAIL_USERNAME }}
         password: ${{ secrets.EMAIL_PASSWORD }}
         subject: 镜像同步完成
-        body: |
+        html_body: |
           镜像同步已完成，请使用新的镜像: `swr.cn-east-3.myhuaweicloud.com/kubesre/docker.io/supabase/studio:20240701-05dfbec-linux-amd64`
           代替旧的镜像 `docker.io/supabase/studio:20240701-05dfbec`
           CPU平台: `linux/amd64`

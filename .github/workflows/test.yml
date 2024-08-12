@@ -62,12 +62,14 @@ jobs:
     - name: Sync Docker Image
       id: synced
       run: |
+        set -e
+        {
         ORIGIN_IMAGE="${{ steps.prepare.outputs.image }}"
         PLATFORM=${{ steps.prepare.outputs.platform }}
         TARGET_TAG="${{ steps.prepare.outputs.target_tag }}"
         BASE_IMAGE=$(echo ${ORIGIN_IMAGE} | sed 's/\(.*\):.*/\1/')
         TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${BASE_IMAGE}:${TARGET_TAG}"
-        docker pull --platform ${PLATFORM} ${ORIGIN_IMAGE}
+        docker pull --platform ${PLATFORM} ${ORIGIN_IMAGE} 
         docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
         docker push ${TARGET_IMAGE}
         curl -s -X POST "${{ secrets.APIURL }}/docker_metadata/" \
@@ -86,7 +88,7 @@ jobs:
           echo "Response: $RESPONSE"
           exit 1
         fi
-
+        } 2> error_log.txt
     - name: Send Email Notification
       if: success() && steps.prepare.outputs.email != ''
       uses: dawidd6/action-send-mail@v3
@@ -105,6 +107,14 @@ jobs:
         convert_markdown: true
         to: ${{ steps.prepare.outputs.email }}
         from: 云原生运维圈镜像站
+    - name: Capture Error Log
+      if: failure()
+      id: capture_error_log
+      run: |
+        if [ -f error_log.txt ]; then
+          ERROR_LOG=$(cat error_log.txt)
+          echo "ERROR_LOG=$ERROR_LOG" >> $GITHUB_ENV
+        fi
     - name: Send Email Notification
       if: failure() && steps.prepare.outputs.email != ''
       uses: dawidd6/action-send-mail@v3
@@ -121,6 +131,6 @@ jobs:
           CPU平台: ` ${{ steps.prepare.outputs.platform }}` <br>
           <br>[云原生运维圈镜像站](https://dockerimage.gbfeng.com/)
         convert_markdown: true
-        body: 镜像同步失败，请检查 image 是否存在,详情查看错误日志:https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        body: 镜像同步失败，请检查 image 是否存在,详情查看错误日志:`{{ env.ERROR_LOG }}`
         to: ${{ steps.prepare.outputs.email }}
         from: 云原生运维圈镜像站

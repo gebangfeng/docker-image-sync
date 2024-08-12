@@ -126,7 +126,7 @@ jobs:
         subject: 镜像同步失败
         html_body: |
           镜像同步失败，请检查 image 是否存在<br>
-          详情查看错误日志: `{{ env.ERROR_LOG }}` <br>
+          详情查看错误日志: `${{ env.ERROR_LOG }}` <br>
           镜像：`${{ steps.prepare.outputs.image }}` <br>
           CPU平台: ` ${{ steps.prepare.outputs.platform }}` <br>
           <br>[云原生运维圈镜像站](https://dockerimage.gbfeng.com/)

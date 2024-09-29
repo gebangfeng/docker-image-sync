@@ -90,16 +90,6 @@ jobs:
           exit 1
         fi
         } 2> error_log.txt
-    - name: with success Replace template content using sed
-      if: success()
-      run: |
-          sed -e "s/{{title}}/${{ env.TITLE }}/g" \
-              -e "s/{{message}}/${{ env.MESSAGE }}/g" \
-              -e "s/{{image_url}}/${{ steps.synced.outputs.origin_image }}/g" \
-              -e "s/{{cpu_platform}}/${{ steps.prepare.outputs.platform }}/g" \
-              -e "s/{{error_log}}/${{ env.ERROR_LOG }}/g" \
-              -e "s|{{url}}|https://dockerimage.gbfeng.com/image/${{ steps.synced.outputs.target_image_simplify}|g" \
-              template/succeed.html
     - name: Send Email Notification
       if: success() && steps.prepare.outputs.email != ''
       uses: dawidd6/action-send-mail@v3

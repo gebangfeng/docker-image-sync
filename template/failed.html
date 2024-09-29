@@ -70,17 +70,17 @@
         
         <div class="highlight">
             <strong>镜像地址：</strong><br>
-            docker.io/centos8:latest
+            {{image_url}}
         </div>
         
-        <p><strong>CPU平台：</strong>linux/amd64</p>
+        <p><strong>CPU平台：</strong>{{cpu_platform}}</p>
 
         <div class="error-message">
             <strong>错误日志：</strong><br>
-            Error response from daemon: pull access denied for centos8, repository does not exist or may require 'docker login': denied: requested access to the resource is denied
+            {{error_log}}
         </div>
 
-        <a href="#" class="button">查看详细错误日志</a>
+        <a href="{{url}}" class="button">查看详细错误日志</a>
 
         <footer>
             <p>如有疑问，请联系技术支持。</p>

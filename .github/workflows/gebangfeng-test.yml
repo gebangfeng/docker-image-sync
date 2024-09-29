@@ -100,7 +100,7 @@ jobs:
         password: ${{ secrets.EMAIL_PASSWORD }}
         subject: 镜像同步完成
         html_body: file://template/succeed.html
-        convert_markdown: true
+        #convert_markdown: true
         to: ${{ steps.prepare.outputs.email }}
         from: 云原生运维圈镜像站
     - name: Capture Error Log
@@ -121,6 +121,6 @@ jobs:
         password: ${{ secrets.EMAIL_PASSWORD }}
         subject: 镜像同步失败
         html_body: file://template/failed.html
-        convert_markdown: true
+        # convert_markdown: true
         to: ${{ steps.prepare.outputs.email }}
         from: 云原生运维圈镜像站

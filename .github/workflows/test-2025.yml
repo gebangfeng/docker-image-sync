@@ -100,11 +100,24 @@ jobs:
         password: ${{ secrets.EMAIL_PASSWORD }}
         subject: 镜像同步完成
         html_body: |
-          镜像同步已完成，请使用新的镜像: `${{ steps.synced.outputs.target_image }}` <br>
-          代替旧的镜像 `${{ steps.synced.outputs.origin_image }}` <br>
-          CPU平台: ` ${{ steps.prepare.outputs.platform }}` <br>
-          查看镜像详细信息和使用快捷复制: [点我直达](https://dockerimage.gbfeng.com/image-detail?image=${{ steps.synced.outputs.target_image_simplify }}) <br>
-          <br>[云原生运维圈镜像站](https://dockerimage.gbfeng.com/)
+
+          <h1>镜像同步通知</h1>
+          <p>尊敬的用户：</p>
+          <p>您的镜像同步已完成，请使用新的镜像地址：</p>
+          <p><span class="important">`${{ steps.synced.outputs.target_image }}`</span> 代替旧的镜像：</p>
+          <p><span class="important">`${{ steps.synced.outputs.origin_image }}` </span></p>
+        
+          <p>CPU平台： ` ${{ steps.prepare.outputs.platform }}`</p>
+
+          <p>查看镜像详细信息和使用快捷复制，请点击下面的按钮：</p>
+        
+          <a href="https://dockerimage.gbfeng.com/image-detail?image=${{ steps.synced.outputs.target_image_simplify }}" class="button">点我直达</a>
+
+          <div class="footer">
+            <p>云原生运维圈镜像站</p>
+            <p>&copy; 2025 云原生运维圈. 保留所有权利。</p>
+          </div>
+          </div>
         convert_markdown: true
         to: ${{ steps.prepare.outputs.email }}
         from: 云原生运维圈镜像站

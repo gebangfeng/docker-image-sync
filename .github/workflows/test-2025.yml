@@ -146,11 +146,11 @@ jobs:
           </style>
           <h1>镜像同步通知</h1>
           <p>尊敬的用户：</p>
-          <p>您的镜像同步已完成，请使用新的镜像地址：</p>
-          <p><span class="important">`${{ steps.synced.outputs.target_image }}`</span> 代替旧的镜像：</p>
-          <p><span class="important">`${{ steps.synced.outputs.origin_image }}` </span></p>
+          <p>您的镜像同步已完成，</p>
+          <p>请使用新的镜像地址：<span class="important">${{ steps.synced.outputs.target_image }}</span> </p>
+          <p>代替旧的镜像：<span class="important">${{ steps.synced.outputs.origin_image }} </span></p>
         
-          <p>CPU平台： ` ${{ steps.prepare.outputs.platform }}`</p>
+          <p>CPU平台：  ${{ steps.prepare.outputs.platform }}</p>
 
           <p>查看镜像详细信息和使用快捷复制，请点击下面的按钮：</p>
         
@@ -182,11 +182,65 @@ jobs:
         password: ${{ secrets.EMAIL_PASSWORD }}
         subject: 镜像同步失败
         html_body: |
-          镜像同步失败，请检查 image 是否存在<br>
-          详情查看错误日志: `${{ env.ERROR_LOG }}` <br>
-          镜像：`${{ steps.prepare.outputs.image }}` <br>
-          CPU平台: ` ${{ steps.prepare.outputs.platform }}` <br>
-          <br>[云原生运维圈镜像站](https://dockerimage.gbfeng.com/)
+              <style>
+              body {
+              font-family: Arial, sans-serif;
+              background-color: #f4f4f4;
+              margin: 0;
+              padding: 0;
+              }
+              .container {
+               width: 600px;
+               margin: 0 auto;
+              background-color: #ffffff;
+              border-radius: 8px;
+              padding: 20px;
+              }
+              h1 {
+              color: #333333;
+              text-align: center;
+                 }
+                 p {
+                 font-size: 16px;
+                  color: #555555;
+                   line-height: 1.6;
+                     }
+                  .important {
+                  color: #d9534f;
+                     font-weight: bold;
+                     }
+                .footer {
+                    text-align: center;
+                     font-size: 12px;
+                      color: #888888;
+                        margin-top: 30px;
+                     }
+                       .error {
+                      background-color: #f8d7da;
+                       color: #721c24;
+                       padding: 10px;
+                       border: 1px solid #f5c6cb;
+                       border-radius: 5px;
+                        margin-top: 20px;
+                          }
+                        <p>尊敬的用户：</p>
+        
+                       <p>我们很抱歉地通知您，镜像同步失败。请检查以下信息：</p>
+        
+                        <div class="error">
+                       <p><span class="important">镜像同步失败，请检查 image 是否存在</span></p>
+                       <p><strong>错误信息：</strong>${{ env.ERROR_LOG }}</p>
+                       <p><strong>镜像：</strong>${{ steps.prepare.outputs.image }}</p>
+                       <p><strong>CPU平台：</strong> ${{ steps.prepare.outputs.platform }}</p>
+                      </div>
+
+                     <p>请检查镜像是否存在，或尝试使用其他平台的镜像。</p>
+
+                      <div class="footer">
+                      <p>云原生运维圈镜像站</p>
+                      <p>&copy; 2025 云原生运维圈. 保留所有权利。</p>
+                          </div>
+                       </div>
         convert_markdown: true
         to: ${{ steps.prepare.outputs.email }}
         from: 云原生运维圈镜像站

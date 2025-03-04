@@ -1,4 +1,5 @@
 name: Sync Image Webhook
+
 on:
   workflow_dispatch:
     inputs:
@@ -24,224 +25,213 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Prepare Image Info
-      id: prepare
-      run: |
-        IMAGE="${{ github.event.inputs.image }}"
-        TAG="${{ github.event.inputs.tag }}"
-        PLATFORM="${{ github.event.inputs.platform }}"
-        EMAIL="${{ github.event.inputs.email }}"
-        ARCH_TAG=$(echo $PLATFORM | tr '/' '-')
-        if [[ -z "${TAG}" ]]; then
-          TAG="latest"
-        fi
-        ORIGIN_IMAGE="${IMAGE}:${TAG}"
-        TARGET_TAG="${TAG}-${ARCH_TAG}"
-        echo "image=${ORIGIN_IMAGE}" >> $GITHUB_OUTPUT
-        echo "platform=${PLATFORM}" >> $GITHUB_OUTPUT
-        echo "email=${EMAIL}" >> $GITHUB_OUTPUT
-        echo "target_tag=${TARGET_TAG}" >> $GITHUB_OUTPUT
+      - name: Prepare Image Info
+        id: prepare
+        run: |
+          IMAGE="${{ github.event.inputs.image }}"
+          TAG="${{ github.event.inputs.tag }}"
+          PLATFORM="${{ github.event.inputs.platform }}"
+          EMAIL="${{ github.event.inputs.email }}"
+          ARCH_TAG=$(echo $PLATFORM | tr '/' '-')
+          if [[ -z "${TAG}" ]]; then
+            TAG="latest"
+          fi
+          ORIGIN_IMAGE="${IMAGE}:${TAG}"
+          TARGET_TAG="${TAG}-${ARCH_TAG}"
+          echo "image=${ORIGIN_IMAGE}" >> $GITHUB_OUTPUT
+          echo "platform=${PLATFORM}" >> $GITHUB_OUTPUT
+          echo "email=${EMAIL}" >> $GITHUB_OUTPUT
+          echo "target_tag=${TARGET_TAG}" >> $GITHUB_OUTPUT
 
-    - name: Check Image
-      run: |
-        ORIGIN_IMAGE="${{ steps.prepare.outputs.image }}"
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
-      with:
-        platforms: ${{ steps.prepare.outputs.platform }}
-    - name: Login to Docker Hub
-      uses: docker/login-action@v1
-      with:
-        registry: ${{ secrets.REGISTRY }}
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Check Image
+        run: |
+          ORIGIN_IMAGE="${{ steps.prepare.outputs.image }}"
 
-    - name: Sync Docker Image
-      id: synced
-      run: |
-        set -e
-        {
-        ORIGIN_IMAGE="${{ steps.prepare.outputs.image }}"
-        PLATFORM=${{ steps.prepare.outputs.platform }}
-        TARGET_TAG="${{ steps.prepare.outputs.target_tag }}"
-        BASE_IMAGE=$(echo ${ORIGIN_IMAGE} | sed 's/\(.*\):.*/\1/')
-        TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${BASE_IMAGE}:${TARGET_TAG}"
-        docker pull --platform ${PLATFORM} ${ORIGIN_IMAGE} 
-        docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
-        docker push ${TARGET_IMAGE}
-        curl -s -X POST "${{ secrets.APIURL }}/docker_metadata/" \
-          -H "Content-Type: application/json" \
-          -d "`docker inspect ${TARGET_IMAGE}`"
-        RESPONSE=$(curl -s -X POST "${{ secrets.APIURL }}/set-image-public/" \
-          -H "Content-Type: application/json" \
-          -d "{\"namespace\": \"${{ secrets.NAMESPACE }}\" , \"repository\": \"${BASE_IMAGE}\" }")
-        EXPECTED_VALUE='{"message":"已将仓库设置为公开"}'
-        if [[ "$RESPONSE" == "$EXPECTED_VALUE" ]]; then
-            echo "镜像同步已完成，请使用新的镜像: ${TARGET_IMAGE}"
-            echo "target_image=${TARGET_IMAGE}" >> $GITHUB_OUTPUT
-            echo "origin_image=${ORIGIN_IMAGE}" >> $GITHUB_OUTPUT
-            echo "target_image_simplify=${BASE_IMAGE}:${TARGET_TAG}" >> $GITHUB_OUTPUT
-        else
-          echo "API call did not return the expected value."
-          echo "Response: $RESPONSE"
-          exit 1
-        fi
-        } 2> error_log.txt
-    - name: Send Email Notification
-      if: success() && steps.prepare.outputs.email != ''
-      uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: ${{ secrets.EMAIL_SERVER }}
-        server_port: ${{ secrets.EMAIL_PORT }}
-        username: ${{ secrets.EMAIL_USERNAME }}
-        password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: 镜像同步完成
-        html_body: |
-          <style>
-          body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 0;
-          }
-          .container {
-            width: 600px;
-            margin: 0 auto;
-            background-color: #ffffff;
-            border-radius: 8px;
-            padding: 20px;
-          }
-          h1 {
-            color: #333333;
-            text-align: center;
-          }
-          p {
-            font-size: 16px;
-            color: #555555;
-            line-height: 1.6;
-          }
-          .important {
-            color: #d9534f;
-            font-weight: bold;
-          }
-          .button {
-            display: inline-block;
-            background-color: #007bff;
-            color: #ffffff;
-            padding: 10px 20px;
-            text-decoration: none;
-            border-radius: 5px;
-            text-align: center;
-            margin: 20px 0;
-          }
-          .footer {
-            text-align: center;
-            font-size: 12px;
-            color: #888888;
-            margin-top: 30px;
-          }
-          </style>
-          <h1>镜像同步通知</h1>
-          <p>尊敬的用户：</p>
-          <p>您的镜像同步已完成，</p>
-          <p>请使用新的镜像地址：<span class="important">${{ steps.synced.outputs.target_image }}</span> </p>
-          <p>代替旧的镜像：<span class="important">${{ steps.synced.outputs.origin_image }} </span></p>
-        
-          <p>CPU平台：  ${{ steps.prepare.outputs.platform }}</p>
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: ${{ steps.prepare.outputs.platform }}
 
-          <p>查看镜像详细信息和使用快捷复制，请点击下面的按钮：</p>
-        
-          <a href="https://dockerimage.gbfeng.com/image-detail?image=${{ steps.synced.outputs.target_image_simplify }}" class="button">点我直达</a>
+      - name: Login to Docker Hub
+        uses: docker/login-action@v1
+        with:
+          registry: ${{ secrets.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-          <div class="footer">
-            <p>云原生运维圈镜像站</p>
-            <p>&copy; 2025 云原生运维圈. 保留所有权利。</p>
-          </div>
-          </div>
-        convert_markdown: true
-        to: ${{ steps.prepare.outputs.email }}
-        from: 云原生运维圈镜像站
-    - name: Capture Error Log
-      if: failure()
-      id: capture_error_log
-      run: |
-        if [ -f error_log.txt ]; then
-          ERROR_LOG=$(cat error_log.txt)
-          echo "ERROR_LOG=$ERROR_LOG" >> $GITHUB_ENV
-        fi
-    - name: Send Email Notification
-      if: failure() && steps.prepare.outputs.email != ''
-      uses: dawidd6/action-send-mail@v3
-      with:
-        server_address: ${{ secrets.EMAIL_SERVER }}
-        server_port: ${{ secrets.EMAIL_PORT }}
-        username: ${{ secrets.EMAIL_USERNAME }}
-        password: ${{ secrets.EMAIL_PASSWORD }}
-        subject: 镜像同步失败
-        html_body: |
-              <style>
-              body {
+      - name: Sync Docker Image
+        id: synced
+        run: |
+          set -e
+          {
+          ORIGIN_IMAGE="${{ steps.prepare.outputs.image }}"
+          PLATFORM=${{ steps.prepare.outputs.platform }}
+          TARGET_TAG="${{ steps.prepare.outputs.target_tag }}"
+          BASE_IMAGE=$(echo ${ORIGIN_IMAGE} | sed 's/\(.*\):.*/\1/')
+          TARGET_IMAGE="${{ secrets.REGISTRY }}/${{ secrets.NAMESPACE }}/${BASE_IMAGE}:${TARGET_TAG}"
+          docker pull --platform ${PLATFORM} ${ORIGIN_IMAGE}
+          docker tag ${ORIGIN_IMAGE} ${TARGET_IMAGE}
+          docker push ${TARGET_IMAGE}
+          curl -s -X POST "${{ secrets.APIURL }}/docker_metadata/" \
+            -H "Content-Type: application/json" \
+            -d "`docker inspect ${TARGET_IMAGE}`"
+          RESPONSE=$(curl -s -X POST "${{ secrets.APIURL }}/set-image-public/" \
+            -H "Content-Type: application/json" \
+            -d "{\"namespace\": \"${{ secrets.NAMESPACE }}\" , \"repository\": \"${BASE_IMAGE}\" }")
+          EXPECTED_VALUE='{"message":"已将仓库设置为公开"}'
+          if [[ "$RESPONSE" == "$EXPECTED_VALUE" ]]; then
+              echo "镜像同步已完成，请使用新的镜像: ${TARGET_IMAGE}"
+              echo "target_image=${TARGET_IMAGE}" >> $GITHUB_OUTPUT
+              echo "origin_image=${ORIGIN_IMAGE}" >> $GITHUB_OUTPUT
+              echo "target_image_simplify=${BASE_IMAGE}:${TARGET_TAG}" >> $GITHUB_OUTPUT
+          else
+            echo "API call did not return the expected value."
+            echo "Response: $RESPONSE"
+            exit 1
+          fi
+          } 2> error_log.txt
+
+      - name: Send Email Notification
+        if: success() && steps.prepare.outputs.email != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.EMAIL_SERVER }}
+          server_port: ${{ secrets.EMAIL_PORT }}
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: 镜像同步完成
+          html_body: |
+            <style>
+            body {
               font-family: Arial, sans-serif;
               background-color: #f4f4f4;
               margin: 0;
               padding: 0;
-              }
-              .container {
-               width: 600px;
-               margin: 0 auto;
+            }
+            .container {
+              width: 600px;
+              margin: 0 auto;
               background-color: #ffffff;
               border-radius: 8px;
               padding: 20px;
-              }
-              h1 {
+            }
+            h1 {
               color: #333333;
               text-align: center;
-                 }
-                 p {
-                 font-size: 16px;
-                  color: #555555;
-                   line-height: 1.6;
-                     }
-                  .important {
-                  color: #d9534f;
-                     font-weight: bold;
-                     }
-                .footer {
-                    text-align: center;
-                     font-size: 12px;
-                      color: #888888;
-                        margin-top: 30px;
-                     }
-                       .error {
-                      background-color: #f8d7da;
-                       color: #721c24;
-                       padding: 10px;
-                       border: 1px solid #f5c6cb;
-                       border-radius: 5px;
-                        margin-top: 20px;
-                          }
-                           </style>
-                        <p>尊敬的用户：</p>
-        
-                       <p>我们很抱歉地通知您，镜像同步失败。请检查以下信息：</p>
-        
-                        <div class="error">
-                       <p><span class="important">镜像同步失败，请检查 image 是否存在</span></p>
-                       <p><strong>错误信息：</strong>${{ env.ERROR_LOG }}</p>
-                       <p><strong>镜像：</strong>${{ steps.prepare.outputs.image }}</p>
-                       <p><strong>CPU平台：</strong> ${{ steps.prepare.outputs.platform }}</p>
-                      </div>
+            }
+            p {
+              font-size: 16px;
+              color: #555555;
+              line-height: 1.6;
+            }
+            .important {
+              color: #d9534f;
+              font-weight: bold;
+            }
+            .button {
+              display: inline-block;
+              background-color: #007bff;
+              color: #ffffff;
+              padding: 10px 20px;
+              text-decoration: none;
+              border-radius: 5px;
+              text-align: center;
+              margin: 20px 0;
+            }
+            .footer {
+              text-align: center;
+              font-size: 12px;
+              color: #888888;
+              margin-top: 30px;
+            }
+            </style>
+            <h1>镜像同步通知</h1>
+            <p>尊敬的用户：</p>
+            <p>您的镜像同步已完成，</p>
+            <p>请使用新的镜像地址：<span class="important">${{ steps.synced.outputs.target_image }}</span> </p>
+            <p>代替旧的镜像：<span class="important">${{ steps.synced.outputs.origin_image }} </span></p>
+            <p>CPU平台： ${{ steps.prepare.outputs.platform }}</p>
+            <p>查看镜像详细信息和使用快捷复制，请点击下面的按钮：</p>
+            <a href="https://dockerimage.gbfeng.com/image-detail?image=${{ steps.synced.outputs.target_image_simplify }}" class="button">点我直达</a>
+            <div class="footer">
+              <p>云原生运维圈镜像站</p>
+              <p>&copy; 2025 云原生运维圈. 保留所有权利。</p>
+            </div>
+          
+      - name: Capture Error Log
+        if: failure()
+        id: capture_error_log
+        run: |
+          if [ -f error_log.txt ]; then
+            ERROR_LOG=$(cat error_log.txt)
+            echo "ERROR_LOG=$ERROR_LOG" >> $GITHUB_ENV
+          fi
 
-                     <p>请检查镜像是否存在，或尝试使用其他平台的镜像。</p>
-
-                      <div class="footer">
-                      <p>云原生运维圈镜像站</p>
-                      <p>&copy; 2025 云原生运维圈. 保留所有权利。</p>
-                          </div>
-                       </div>
-        convert_markdown: true
-        to: ${{ steps.prepare.outputs.email }}
-        from: 云原生运维圈镜像站
+      - name: Send Email Notification
+        if: failure() && steps.prepare.outputs.email != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.EMAIL_SERVER }}
+          server_port: ${{ secrets.EMAIL_PORT }}
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: 镜像同步失败
+          html_body: |
+            <style>
+            body {
+              font-family: Arial, sans-serif;
+              background-color: #f4f4f4;
+              margin: 0;
+              padding: 0;
+            }
+            .container {
+              width: 600px;
+              margin: 0 auto;
+              background-color: #ffffff;
+              border-radius: 8px;
+              padding: 20px;
+            }
+            h1 {
+              color: #333333;
+              text-align: center;
+            }
+            p {
+              font-size: 16px;
+              color: #555555;
+              line-height: 1.6;
+            }
+            .important {
+              color: #d9534f;
+              font-weight: bold;
+            }
+            .footer {
+              text-align: center;
+              font-size: 12px;
+              color: #888888;
+              margin-top: 30px;
+            }
+            .error {
+              background-color: #f8d7da;
+              color: #721c24;
+              padding: 10px;
+              border: 1px solid #f5c6cb;
+              border-radius: 5px;
+              margin-top: 20px;
+            }
+            </style>
+            <p>尊敬的用户：</p>
+            <p>我们很抱歉地通知您，镜像同步失败。请检查以下信息：</p>
+            <div class="error">
+              <p><span class="important">镜像同步失败，请检查 image 是否存在</span></p>
+              <p><strong>错误信息：</strong>${{ env.ERROR_LOG }}</p>
+              <p><strong>镜像：</strong>${{ steps.prepare.outputs.image }}</p>
+              <p><strong>CPU平台：</strong> ${{ steps.prepare.outputs.platform }}</p>
+            </div>
+            <p>请检查镜像是否存在，或尝试使用其他平台的镜像。</p>
+            <div class="footer">
+              <p>云原生运维圈镜像站</p>
+              <p>&copy; 2025 云原生运维圈. 保留所有权利。</p>
+            </div>

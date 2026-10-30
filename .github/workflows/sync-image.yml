@@ -1,0 +1,205 @@
+name: Sync Image Webhook
+run-name: ${{ inputs.task_id != '' && format('Sync task {0}', inputs.task_id) || format('Sync {0}:{1}', inputs.image, inputs.tag) }}
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: Website task ID (leave empty for manual standalone runs)
+        required: false
+        type: string
+      image:
+        description: Source image repository
+        required: true
+        type: string
+      tag:
+        description: Source tag
+        default: latest
+        required: true
+        type: string
+      platform:
+        description: Target platform
+        default: linux/amd64
+        type: choice
+        options: [linux/amd64, linux/arm64, linux/arm]
+      email:
+        description: Notification email (optional)
+        required: false
+        type: string
+permissions:
+  contents: read
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      TASK_ID: ${{ inputs.task_id }}
+      SOURCE_IMAGE: ${{ inputs.image }}
+      SOURCE_TAG: ${{ inputs.tag }}
+      PLATFORM: ${{ inputs.platform }}
+      NOTIFY_EMAIL: ${{ inputs.email }}
+      REGISTRY: ${{ secrets.REGISTRY }}
+      NAMESPACE: ${{ secrets.NAMESPACE }}
+      # Full API prefix, for example https://docker.gbfeng.com/api/v1
+      API_BASE: ${{ secrets.SITE_API_BASE }}
+      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+      WORKFLOW_CALLBACK_TOKEN: ${{ secrets.WORKFLOW_CALLBACK_TOKEN }}
+    steps:
+      - name: Validate inputs and prepare addresses
+        id: prepare
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os, re, urllib.parse
+          image, tag = os.environ['SOURCE_IMAGE'], os.environ['SOURCE_TAG'] or 'latest'
+          platform = os.environ['PLATFORM'] or 'linux/amd64'
+          task_id = os.environ['TASK_ID']
+          if task_id and not re.fullmatch(r'[a-f0-9]{32}', task_id):
+              raise SystemExit('Invalid task ID')
+          domain = r'[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]{1,5})?'
+          part = r'[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*'
+          if '/' not in image or ('.' not in image.split('/')[0] and ':' not in image.split('/')[0] and image.split('/')[0] != 'localhost'):
+              image = 'docker.io/' + image
+          parts = image.split('/')
+          if parts[0] == 'docker.io' and len(parts) == 2:
+              parts.insert(1, 'library')
+          if not re.fullmatch(domain, parts[0]) or not all(re.fullmatch(part, p) for p in parts[1:]):
+              raise SystemExit('Invalid image name')
+          if not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}', tag):
+              raise SystemExit('Invalid image tag')
+          if platform not in ('linux/amd64', 'linux/arm64', 'linux/arm'):
+              raise SystemExit('Invalid platform')
+          target_tag = tag + '-' + platform.replace('/', '-')
+          if len(target_tag) > 128:
+              raise SystemExit('Target tag exceeds 128 characters')
+          registry, namespace = os.environ['REGISTRY'], os.environ['NAMESPACE']
+          if not re.fullmatch(domain, registry) or not re.fullmatch(part, namespace):
+              raise SystemExit('Invalid registry or namespace')
+          api = os.environ['API_BASE'].rstrip('/')
+          u = urllib.parse.urlparse(api)
+          if u.scheme != 'https' or not u.netloc or u.username or u.password or u.query or u.fragment:
+              raise SystemExit('SITE_API_BASE must be an HTTPS URL, e.g. https://docker.gbfeng.com/api/v1')
+          if not os.environ['ADMIN_TOKEN'] or (task_id and not os.environ['WORKFLOW_CALLBACK_TOKEN']):
+              raise SystemExit('Missing workflow credentials')
+          name = '/'.join(parts)
+          origin = name + ':' + tag
+          # A source registry port cannot appear inside the destination repository path.
+          target_name = '/'.join([parts[0].replace(':', '-')] + parts[1:])
+          target = registry + '/' + namespace + '/' + target_name + ':' + target_tag
+          with open(os.environ['GITHUB_ENV'], 'a') as f:
+              for key, value in {'ORIGIN_IMAGE': origin, 'BASE_IMAGE': target_name, 'TARGET_IMAGE': target, 'PLATFORM': platform, 'API_BASE': api}.items():
+                  f.write(key + '=' + value + '\n')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write('origin_image=' + origin + '\n')
+              f.write('target_image=' + target + '\n')
+          PY
+
+      - name: Report running status
+        if: inputs.task_id != ''
+        # A callback outage must not prevent image synchronization.
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n --argjson run_id "$GITHUB_RUN_ID" --argjson attempt "$GITHUB_RUN_ATTEMPT" \
+            '{status:"running",run_id:$run_id,run_attempt:$attempt}' > event.json
+          curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
+            --retry 3 --retry-all-errors --retry-delay 3 \
+            -H "Authorization: Bearer $WORKFLOW_CALLBACK_TOKEN" -H 'Content-Type: application/json' \
+            --data-binary @event.json "$API_BASE/tasks/$TASK_ID/events"
+
+      - name: Log in to target registry
+        id: login
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Pull and push image
+        id: push
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform "$PLATFORM" "$ORIGIN_IMAGE"
+          docker tag "$ORIGIN_IMAGE" "$TARGET_IMAGE"
+          docker push "$TARGET_IMAGE"
+
+      - name: Make repository public
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n --arg namespace "$NAMESPACE" --arg repository "$BASE_IMAGE" \
+            '{namespace:$namespace,repository:$repository}' > publish.json
+          curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
+            --retry 3 --retry-all-errors --retry-delay 3 \
+            -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+            --data-binary @publish.json "$API_BASE/image/set-image-public/"
+
+      - name: Upload supplemental metadata
+        id: metadata
+        if: steps.publish.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker inspect "$TARGET_IMAGE" > metadata.json
+          curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
+            --retry 3 --retry-all-errors --retry-delay 3 \
+            -H "Authorization: Bearer $ADMIN_TOKEN" -H 'Content-Type: application/json' \
+            --data-binary @metadata.json "$API_BASE/image/docker_metadata/"
+
+      - name: Report final status
+        if: always() && inputs.task_id != '' && steps.prepare.outcome == 'success'
+        env:
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+          JOB_STATUS: ${{ job.status }}
+          LOGIN_OUTCOME: ${{ steps.login.outcome }}
+          PUSH_OUTCOME: ${{ steps.push.outcome }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          STATE=failed
+          STAGE=publish
+          if [ "$LOGIN_OUTCOME" != success ]; then STAGE=login
+          elif [ "$PUSH_OUTCOME" != success ]; then STAGE=transfer
+          fi
+          if [ "$PUBLISH_OUTCOME" = success ]; then STATE=succeeded
+          elif [ "$JOB_STATUS" = cancelled ]; then STATE=cancelled
+          fi
+          jq -n --arg status "$STATE" --arg target "$TARGET_IMAGE" --arg stage "$STAGE" \
+            --argjson run_id "$GITHUB_RUN_ID" --argjson attempt "$GITHUB_RUN_ATTEMPT" \
+            '{status:$status,stage:$stage,target_image:$target,run_id:$run_id,run_attempt:$attempt}' > event.json
+          curl --fail-with-body --silent --show-error --connect-timeout 10 --max-time 30 \
+            --retry 3 --retry-all-errors --retry-delay 3 \
+            -H "Authorization: Bearer $WORKFLOW_CALLBACK_TOKEN" -H 'Content-Type: application/json' \
+            --data-binary @event.json "$API_BASE/tasks/$TASK_ID/events"
+
+      - name: Prepare notification content
+        if: always() && inputs.email != '' && steps.prepare.outcome == 'success'
+        env:
+          PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import html, os
+          title = '镜像同步完成' if os.environ['PUBLISH_OUTCOME'] == 'success' else '镜像同步未完成，请查看任务状态'
+          link = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+          with open('notification.html', 'w') as f:
+              f.write('<h2>' + title + '</h2><p>源镜像：' + html.escape(os.environ['ORIGIN_IMAGE']) + '</p><p>目标地址：' + html.escape(os.environ['TARGET_IMAGE']) + '</p><p>平台：' + html.escape(os.environ['PLATFORM']) + '</p><a href="' + html.escape(link, quote=True) + '">查看工作流</a>')
+          PY
+
+      - name: Send email notification
+        if: always() && inputs.email != '' && steps.prepare.outcome == 'success'
+        continue-on-error: true
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.EMAIL_SERVER }}
+          server_port: ${{ secrets.EMAIL_PORT }}
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: 云原生镜像站 · 同步任务结果
+          html_body: file://notification.html
+          to: ${{ inputs.email }}
+          from: 云原生镜像站

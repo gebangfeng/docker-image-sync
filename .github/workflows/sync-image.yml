@@ -183,11 +183,25 @@ jobs:
         shell: bash
         run: |
           python3 - <<'PY'
-          import html, os
-          title = '镜像同步完成' if os.environ['PUBLISH_OUTCOME'] == 'success' else '镜像同步未完成，请查看任务状态'
-          link = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+          import html, os, urllib.parse
+          success = os.environ['PUBLISH_OUTCOME'] == 'success'
+          title = '镜像同步完成' if success else '镜像同步未完成，请查看任务状态'
+          run_link = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}"
+          api = urllib.parse.urlsplit(os.environ['API_BASE'])
+          site = urllib.parse.urlunsplit((api.scheme, api.netloc, '', '', ''))
+          target = os.environ['TARGET_IMAGE']
+          image = target.split('/', 2)[2].replace('$', '/')
+          detail_link = site + '/image-detail?image=' + urllib.parse.quote(image, safe='')
+          links = []
+          if success:
+              links.append(('查看镜像详情', detail_link))
+          if os.environ.get('TASK_ID'):
+              links.append(('查看任务状态', site + '/sync/tasks/' + urllib.parse.quote(os.environ['TASK_ID'], safe='')))
+          links.append(('查看工作流日志', run_link))
           with open('notification.html', 'w') as f:
-              f.write('<h2>' + title + '</h2><p>源镜像：' + html.escape(os.environ['ORIGIN_IMAGE']) + '</p><p>目标地址：' + html.escape(os.environ['TARGET_IMAGE']) + '</p><p>平台：' + html.escape(os.environ['PLATFORM']) + '</p><a href="' + html.escape(link, quote=True) + '">查看工作流</a>')
+              f.write('<h2>' + title + '</h2><p>源镜像：' + html.escape(os.environ['ORIGIN_IMAGE']) + '</p><p>目标地址：' + html.escape(target) + '</p><p>平台：' + html.escape(os.environ['PLATFORM']) + '</p>')
+              for label, url in links:
+                  f.write('<p><a href="' + html.escape(url, quote=True) + '">' + label + '</a></p>')
           PY
 
       - name: Send email notification

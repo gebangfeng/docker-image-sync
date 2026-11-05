@@ -116,12 +116,18 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Pull and push image
+      - name: Pull source image
+        id: pull
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker pull --platform "$PLATFORM" "$ORIGIN_IMAGE" 2>&1 | tee "$RUNNER_TEMP/image-hub-pull.log"
+
+      - name: Push target image
         id: push
         shell: bash
         run: |
           set -euo pipefail
-          docker pull --platform "$PLATFORM" "$ORIGIN_IMAGE"
           docker tag "$ORIGIN_IMAGE" "$TARGET_IMAGE"
           docker push "$TARGET_IMAGE"
 
@@ -156,6 +162,7 @@ jobs:
           PUBLISH_OUTCOME: ${{ steps.publish.outcome }}
           JOB_STATUS: ${{ job.status }}
           LOGIN_OUTCOME: ${{ steps.login.outcome }}
+          PULL_OUTCOME: ${{ steps.pull.outcome }}
           PUSH_OUTCOME: ${{ steps.push.outcome }}
         shell: bash
         run: |
@@ -163,7 +170,15 @@ jobs:
           STATE=failed
           STAGE=publish
           if [ "$LOGIN_OUTCOME" != success ]; then STAGE=login
-          elif [ "$PUSH_OUTCOME" != success ]; then STAGE=transfer
+          elif [ "$PULL_OUTCOME" != success ]; then
+            STAGE=pull
+            PULL_LOG="$RUNNER_TEMP/image-hub-pull.log"
+            if grep -Eiq 'toomanyrequests|too many requests|rate.?limit' "$PULL_LOG"; then STAGE=pull_limited
+            elif grep -Eiq 'no matching manifest|does not match the specified platform|no match for platform' "$PULL_LOG"; then STAGE=pull_platform
+            elif grep -Eiq 'manifest unknown|name unknown|not found' "$PULL_LOG"; then STAGE=pull_not_found
+            elif grep -Eiq 'unauthorized|authentication required|pull access denied' "$PULL_LOG"; then STAGE=pull_denied
+            fi
+          elif [ "$PUSH_OUTCOME" != success ]; then STAGE=push
           fi
           if [ "$PUBLISH_OUTCOME" = success ]; then STATE=succeeded
           elif [ "$JOB_STATUS" = cancelled ]; then STATE=cancelled

@@ -30,7 +30,9 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # Large images may take longer to pull and push. Set the repository variable
+    # IMAGE_SYNC_TIMEOUT_MINUTES to override this bound.
+    timeout-minutes: ${{ fromJSON(vars.IMAGE_SYNC_TIMEOUT_MINUTES || '120') }}
     env:
       TASK_ID: ${{ inputs.task_id }}
       SOURCE_IMAGE: ${{ inputs.image }}

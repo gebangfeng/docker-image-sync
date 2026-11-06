@@ -193,6 +193,8 @@ jobs:
             -H "Authorization: Bearer $WORKFLOW_CALLBACK_TOKEN" -H 'Content-Type: application/json' \
             --data-binary @event.json "$API_BASE/tasks/$TASK_ID/events"
 
+      # Website-managed notifications omit inputs.email and are sent by the site's
+      # persistent notifier. Standalone/legacy requests can still send mail here.
       - name: Prepare notification content
         if: always() && inputs.email != '' && steps.prepare.outcome == 'success'
         env:
